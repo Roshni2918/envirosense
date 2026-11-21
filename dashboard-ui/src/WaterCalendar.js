@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import API_URL from "./config";
 
 const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const marathiMonths = ["जानेवारी","फेब्रुवारी","मार्च","एप्रिल","मे","जून","जुलै","ऑगस्ट","सप्टेंबर","ऑक्टोबर","नोव्हेंबर","डिसेंबर"];
@@ -16,7 +17,7 @@ const WaterCalendar = ({ t, i18n, token }) => {
   const fetchCalendarData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/calendar-data?year=${currentYear}&month=${currentMonth + 1}`);
+      const res = await fetch(`${API_URL}/api/calendar-data?year=${currentYear}&month=${currentMonth + 1}`);
       const data = await res.json();
       if (data.data) {
         const map = {};

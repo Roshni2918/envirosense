@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import API_URL from "./config";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { io } from "socket.io-client";
@@ -14,7 +15,7 @@ import ReportIssue from "./ReportIssue";
 import usePushNotifications from "./usePushNotifications";
 import "./App.css";
 
-const socket = io("http://localhost:5000");
+const socket = io(API_URL || undefined, { reconnection: process.env.NODE_ENV !== 'production' });
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -134,7 +135,7 @@ const Dashboard = () => {
 
   const fetchLatestData = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/sensor-data/latest");
+      const res = await fetch(`${API_URL}/api/sensor-data/latest`);
       const data = await res.json();
       if (data.data) { setLatestData(data.data); setLastUpdate(new Date()); }
     } catch (e) { console.error(e); }
@@ -142,7 +143,7 @@ const Dashboard = () => {
 
   const fetchSensorHistory = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/sensor-data?limit=24");
+      const res = await fetch(`${API_URL}/api/sensor-data?limit=24`);
       const data = await res.json();
       if (data.data) {
         setSensorHistory(data.data);
@@ -152,7 +153,7 @@ const Dashboard = () => {
 
   const fetchAlerts = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/alerts/unresolved", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/alerts/unresolved`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (data.data) setAlerts(data.data);
     } catch (e) { console.error(e); }
@@ -160,7 +161,7 @@ const Dashboard = () => {
 
   const fetchSystemHealth = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/system-health");
+      const res = await fetch(`${API_URL}/api/system-health`);
       const data = await res.json();
       if (data.data) setSystemHealth(data.data);
     } catch (e) { console.error(e); }
@@ -170,7 +171,7 @@ const Dashboard = () => {
     if (!historyStart || !historyEnd) return alert("Please select start and end dates");
     setHistoryLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/user/data?start_date=${historyStart}&end_date=${historyEnd}`, {
+      const res = await fetch(`${API_URL}/api/user/data?start_date=${historyStart}&end_date=${historyEnd}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -206,7 +207,7 @@ const Dashboard = () => {
   const downloadCSV = async () => {
     try {
       const params = (historyStart && historyEnd) ? `?start_date=${historyStart}&end_date=${historyEnd}` : '';
-      const res = await fetch(`http://localhost:5000/api/csv-export${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/csv-export${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = `water-quality-${historyStart || 'all'}.csv`;
@@ -217,7 +218,7 @@ const Dashboard = () => {
   const downloadFile = async (path, extension) => {
     try {
       const params = (historyStart && historyEnd) ? `?start_date=${historyStart}&end_date=${historyEnd}` : '';
-      const res = await fetch(`http://localhost:5000${path}${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}${path}${params}`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error('export failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

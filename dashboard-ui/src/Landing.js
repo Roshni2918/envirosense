@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
+import API_URL from "./config";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { io } from "socket.io-client";
 import WaterSourcesMap from "./WaterSourcesMap";
 
-const socket = io("http://localhost:5000");
+const socket = io(API_URL || undefined, { reconnection: process.env.NODE_ENV !== 'production' });
 
 function Landing() {
   const navigate = useNavigate();
@@ -16,8 +17,8 @@ function Landing() {
     const fetchAll = async () => {
       try {
         const [sensorRes, summaryRes] = await Promise.all([
-          fetch("http://localhost:5000/api/sensor-data?limit=24").catch(() => null),
-          fetch("http://localhost:5000/api/summary").catch(() => null),
+          fetch(`${API_URL}/api/sensor-data?limit=24`).catch(() => null),
+          fetch(`${API_URL}/api/summary`).catch(() => null),
         ]);
         if (sensorRes && sensorRes.ok) {
           const d = await sensorRes.json();
@@ -32,6 +33,9 @@ function Landing() {
       } catch (e) { console.error(e); }
     };
     fetchAll();
+    // Refetch periodically so the page stays fresh where WebSockets are
+    // unavailable (e.g. Vercel serverless) — socket updates still win locally.
+    const refetch = setInterval(fetchAll, 600000);
 
     setLiveStatus('connected');
     socket.on('connect', () => setLiveStatus('connected'));
@@ -41,7 +45,7 @@ function Landing() {
         setStats(prev => ({ ...prev, readings: prev.readings + 1 }));
       }
     });
-    return () => { socket.off('sensor-update'); };
+    return () => { clearInterval(refetch); socket.off('sensor-update'); };
   }, []);
 
   useEffect(() => {

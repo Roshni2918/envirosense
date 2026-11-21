@@ -1,5 +1,6 @@
 // Register.js
 import { useState } from "react";
+import API_URL from "./config";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import "./App.css";
@@ -24,7 +25,7 @@ function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const res = await fetch("http://localhost:5000/api/register", {
+    const res = await fetch(`${API_URL}/api/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData)

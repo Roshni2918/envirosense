@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import API_URL from "./config";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import jsPDF from "jspdf";
@@ -39,7 +40,7 @@ function AdminDashboard() {
 
   const fetchSensorData = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/sensor-data?limit=50");
+      const res = await fetch(`${API_URL}/api/sensor-data?limit=50`);
       const data = await res.json();
       if (data.data) {
         setSensorData(data.data);
@@ -49,7 +50,7 @@ function AdminDashboard() {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/users", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/users`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (data.data) setUsers(data.data);
     } catch (e) { console.error(e); }
@@ -57,7 +58,7 @@ function AdminDashboard() {
 
   const fetchAlerts = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/alerts", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/alerts`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (data.data) setAlerts(data.data);
     } catch (e) { console.error(e); }
@@ -65,14 +66,14 @@ function AdminDashboard() {
 
   const fetchQueries = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/queries", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/queries`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (data.data) setQueries(data.data);
     } catch (e) { console.error(e); }
   };
   const fetchLatestData = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/sensor-data/latest");
+      const res = await fetch(`${API_URL}/api/sensor-data/latest`);
       const data = await res.json();
       if (data.data) setLatestData(data.data);
     } catch (e) { console.error(e); }
@@ -80,7 +81,7 @@ function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/stats");
+      const res = await fetch(`${API_URL}/api/stats`);
       const data = await res.json();
       if (data.data) setStats(data.data);
     } catch (e) { console.error(e); }
@@ -88,7 +89,7 @@ function AdminDashboard() {
 
   const fetchCommunityReports = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/community-reports/all", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/community-reports/all`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (data.data) setCommunityReports(data.data);
     } catch (e) { console.error(e); }
@@ -96,7 +97,7 @@ function AdminDashboard() {
 
   const fetchSubscribers = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/alert-subscribers", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/alert-subscribers`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (data.data) setSubscribers(data.data);
     } catch (e) { console.error(e); }
@@ -106,7 +107,7 @@ function AdminDashboard() {
     const note = status === 'Resolved'
       ? window.prompt('Add a short note for the user (optional):') || 'Issue resolved by the water authority'
       : null;
-    await fetch(`http://localhost:5000/api/community-reports/${id}`, {
+    await fetch(`${API_URL}/api/community-reports/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status, admin_note: note })
@@ -125,41 +126,41 @@ function AdminDashboard() {
 
   const handleBlock = async (id) => {
     if (!window.confirm("Block this user?")) return;
-    await fetch(`http://localhost:5000/api/users/${id}/block`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`${API_URL}/api/users/${id}/block`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
     fetchUsers();
   };
 
   const handleUnblock = async (id) => {
-    await fetch(`http://localhost:5000/api/users/${id}/unblock`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`${API_URL}/api/users/${id}/unblock`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
     fetchUsers();
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this user permanently?")) return;
-    await fetch(`http://localhost:5000/api/users/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`${API_URL}/api/users/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
     fetchUsers();
   };
 
   const handleResolveAlert = async (id) => {
-    await fetch(`http://localhost:5000/api/alerts/${id}/resolve`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`${API_URL}/api/alerts/${id}/resolve`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
     fetchAlerts();
   };
 
   const handleDeleteSubscriber = async (id) => {
     if (!window.confirm("Remove this subscriber from critical alerts?")) return;
-    await fetch(`http://localhost:5000/api/alert-subscribers/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`${API_URL}/api/alert-subscribers/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
     fetchSubscribers();
   };
 
   const handleResolveQuery = async (id) => {
-    await fetch(`http://localhost:5000/api/queries/${id}/resolve`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`${API_URL}/api/queries/${id}/resolve`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
     fetchQueries();
   };
 
   const generatePDFReport = async () => {
     try {
       const params = (reportStartDate && reportEndDate) ? `?start_date=${reportStartDate}&end_date=${reportEndDate}` : '';
-      const res = await fetch(`http://localhost:5000/api/report/data${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/report/data${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       const rows = data.data || [];
       if (rows.length === 0) return alert("No data for the selected period");
@@ -522,8 +523,8 @@ function AdminDashboard() {
                       <td style={{ maxWidth: 220, fontSize: 12 }}>{r.description}</td>
                       <td>
                         {r.photo_url
-                          ? <a href={`http://localhost:5000${r.photo_url}`} target="_blank" rel="noreferrer">
-                              <img src={`http://localhost:5000${r.photo_url}`} alt="report" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} />
+                          ? <a href={`${API_URL}${r.photo_url}`} target="_blank" rel="noreferrer">
+                              <img src={`${API_URL}${r.photo_url}`} alt="report" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} />
                             </a>
                           : '-'}
                       </td>

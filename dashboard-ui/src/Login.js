@@ -1,4 +1,5 @@
 import { useState } from "react";
+import API_URL from "./config";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import "./App.css";
@@ -16,7 +17,7 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const res = await fetch("http://localhost:5000/api/login", {
+    const res = await fetch(`${API_URL}/api/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)

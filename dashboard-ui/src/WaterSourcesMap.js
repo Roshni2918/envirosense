@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import API_URL from "./config";
 
 const sourceTypeIcons = {
   Well: "🪣", River: "🌊", Lake: "🏞️", Pond: "🪷", Borewell: "⛲"
@@ -20,7 +21,7 @@ const WaterSourcesMap = ({ t, i18n }) => {
   useEffect(() => {
     const fetchSources = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/water-sources");
+        const res = await fetch(`${API_URL}/api/water-sources`);
         const data = await res.json();
         if (data.data) setSources(data.data);
       } catch (e) { console.error(e); }

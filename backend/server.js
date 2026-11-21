@@ -46,6 +46,18 @@ const JWT_SECRET = process.env.JWT_SECRET || 'nagaon_river_secret_key_2024';
 app.use(cors());
 app.use(express.json());
 
+// Serverless (Vercel) cold starts: block requests until MongoDB is connected,
+// defaults are seeded and the simulator is warm-started. Resolves at boot locally.
+let dbReady = Promise.resolve();
+app.use((req, res, next) => {
+  dbReady
+    .then(() => next())
+    .catch((err) => {
+      console.error('Startup error:', err.message);
+      res.status(500).json({ message: 'Service is starting, please retry shortly.' });
+    });
+});
+
 // ================= AUTH MIDDLEWARE =================
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -206,18 +218,110 @@ const persistReading = async (sensorData) => {
   return reading;
 };
 
-// ================= CRON JOB (every hour by default) =================
-cron.schedule(SENSOR_CRON, async () => {
-  console.log('Generating sensor data...');
+// ================= HOURLY BACKFILL (serverless-friendly) =================
+// Vercel's free plan cannot run an hourly cron (max 1 run/day), so whenever
+// readings are requested we top up every missing hourly slot over the recent
+// window (last 14 days) — both internal holes and the newest edge. History
+// therefore always looks hourly, with the same slight drift simulation.
+// node-cron still does the real hourly job when the server runs locally.
+let backfillLock = false;
+const backfillHourlyReadings = async (maxSlots = 360) => {
+  if (backfillLock) return 0; // one fill at a time per process
+  backfillLock = true;
   try {
-    const sensorData = generateSensorData();
-    const saved = await persistReading(sensorData);
-    console.log('Sensor data inserted:', JSON.stringify({
-      reading_id: saved.reading_id, ph: saved.ph, tds: saved.tds, turbidity: saved.turbidity,
-      recorded_at: saved.recorded_at
-    }));
+    const HOUR = 60 * 60 * 1000;
+    const WINDOW = 14 * 24 * HOUR;
+    const now = Date.now();
+    const from = now - WINDOW;
+    // Newest sample BEFORE the window — the drift anchor for continuity.
+    const before = await db.collection('sensor_readings')
+      .find({ recorded_at: { $lt: new Date(from) } },
+        { projection: { recorded_at: 1, ph: 1, tds: 1, turbidity: 1 } })
+      .sort({ recorded_at: -1 }).limit(1).toArray();
+    const rows = await db.collection('sensor_readings')
+      .find({ recorded_at: { $gte: new Date(from) } },
+        { projection: { recorded_at: 1, ph: 1, tds: 1, turbidity: 1 } })
+      .sort({ recorded_at: 1 }).toArray();
+    if (!before.length && !rows.length) return 0;
+
+    const anchor = before.length ? before[0] : rows[0];
+    seedState(anchor);
+    const byTime = new Map(rows.map(r => [r.recorded_at.getTime(), r]));
+
+    // Walk the hourly grid (samples sit on the :30 UTC grid) collecting gaps.
+    let t;
+    if (before.length) {
+      t = before[0].recorded_at.getTime();
+      while (t < from - HOUR) t += HOUR; // jump to the window, grid preserved
+    } else {
+      t = Math.ceil((from - 1800000) / HOUR) * HOUR + 1800000; // first grid point >= from
+    }
+    const docs = [];
+    while (t + HOUR <= now && docs.length < maxSlots) {
+      t += HOUR;
+      const known = byTime.get(t);
+      if (known) { seedState(known); continue; } // real sample — re-anchor
+      const at = new Date(t);
+      const d = generateSensorData(at);
+      docs.push({
+        sensor_id: 1, reading_value: 0, reading_unit: null,
+        reading_time: at, recorded_at: at,
+        ph: d.ph, tds: d.tds, turbidity: d.turbidity
+      });
+    }
+    if (!docs.length) return 0;
+    // Allocate numeric ids in one atomic counter bump (same scheme as insertDoc)
+    const prev = await db.collection('counters').findOneAndUpdate(
+      { _id: 'sensor_readings' },
+      { $inc: { seq: docs.length } },
+      { upsert: true, returnDocument: 'before' }
+    );
+    const beforeDoc = prev && typeof prev === 'object' && prev.value !== undefined && prev.value !== null ? prev.value : prev;
+    const base = beforeDoc && typeof beforeDoc.seq === 'number' ? beforeDoc.seq : 0;
+    docs.forEach((d, i) => { d._id = base + i + 1; });
+    await db.collection('sensor_readings').insertMany(docs, { ordered: false });
+    console.log(`Backfilled ${docs.length} hourly reading(s)`);
+    return docs.length;
+  } catch (e) {
+    if (e && e.code === 11000) return 0; // concurrent backfill already filled the gap
+    console.warn('Backfill skipped:', e.message);
+    return 0;
+  } finally {
+    backfillLock = false;
+  }
+};
+
+// ================= CRON JOB =================
+// Local: real hourly schedule. Vercel: disabled (free plan = daily max) —
+// replaced by the backfill above plus the daily /api/cron/insert-reading below.
+if (!process.env.VERCEL) {
+  cron.schedule(SENSOR_CRON, async () => {
+    console.log('Generating sensor data...');
+    try {
+      const sensorData = generateSensorData();
+      const saved = await persistReading(sensorData);
+      console.log('Sensor data inserted:', JSON.stringify({
+        reading_id: saved.reading_id, ph: saved.ph, tds: saved.tds, turbidity: saved.turbidity,
+        recorded_at: saved.recorded_at
+      }));
+    } catch (err) {
+      console.error('Error inserting sensor data:', err.message);
+    }
+  });
+}
+
+// Daily Vercel cron target (see vercel.json "crons") — creates the current-hour
+// reading and runs the normal alert check. Secured by CRON_SECRET when set.
+app.get('/api/cron/insert-reading', async (req, res) => {
+  try {
+    if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const saved = await persistReading(generateSensorData());
+    res.json({ ok: true, reading: saved });
   } catch (err) {
-    console.error('Error inserting sensor data:', err.message);
+    console.error('Cron insert failed:', err.message);
+    res.status(500).json({ ok: false, message: err.message });
   }
 });
 
@@ -342,11 +446,13 @@ app.put('/api/change-password', authenticateToken, async (req, res) => {
 
 // ================= SENSOR DATA ROUTES =================
 app.get('/api/sensor-data/latest', async (req, res) => {
+  await backfillHourlyReadings();
   const latest = await db.collection('sensor_readings').findOne({}, { sort: { recorded_at: -1 } });
   res.json({ data: latest ? db.present(latest, 'reading_id') : undefined });
 });
 
 app.get('/api/sensor-data', async (req, res) => {
+  await backfillHourlyReadings();
   const limit = parseInt(req.query.limit || '50', 10);
   const offset = parseInt(req.query.offset || '0', 10);
   const rows = await db.collection('sensor_readings')
@@ -359,6 +465,7 @@ app.get('/api/sensor-data', async (req, res) => {
 });
 
 app.get('/api/sensor-data/charts', async (req, res) => {
+  await backfillHourlyReadings();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const rows = await db.collection('sensor_readings')
     .find({ recorded_at: { $gte: since } })
@@ -378,6 +485,7 @@ app.post('/api/sensor-data', async (req, res) => {
 
 // ================= CALENDAR DATA =================
 app.get('/api/calendar-data', async (req, res) => {
+  await backfillHourlyReadings();
   const year = parseInt(req.query.year, 10) || new Date().getFullYear();
   const month = parseInt(req.query.month, 10) || new Date().getMonth() + 1;
   const start = new Date(year, month - 1, 1);
@@ -660,6 +768,7 @@ app.put('/api/queries/:id/resolve', authenticateToken, authenticateAdmin, async 
 
 // ================= USER DATA ROUTE =================
 app.get('/api/user/data', authenticateToken, async (req, res) => {
+  await backfillHourlyReadings();
   try {
     res.json({ data: await fetchReadingsByDate(req) });
   } catch (e) {
@@ -829,23 +938,32 @@ const ensureDefaults = async () => {
 };
 
 // ================= START SERVER =================
-(async () => {
-  try {
-    await db.connect();
-    await ensureDefaults();
+// On Vercel this module IS the serverless function (exported below) — no
+// listener and no node-cron there; the readiness middleware above waits on
+// this promise for every request during a cold start.
+dbReady = (async () => {
+  await db.connect();
+  await ensureDefaults();
 
-    // Continue the simulation from the newest stored reading
-    const latest = await db.collection('sensor_readings').findOne({}, { sort: { recorded_at: -1 } });
-    seedState(latest);
+  // Continue the simulation from the newest stored reading
+  const latest = await db.collection('sensor_readings').findOne({}, { sort: { recorded_at: -1 } });
+  seedState(latest);
 
+  if (process.env.VERCEL) {
+    console.log('Vercel serverless mode: on-read hourly backfill + daily cron endpoint active');
+  } else {
     server.listen(PORT, () => {
       console.log(`EnviroSense v3.0 Backend running on port ${PORT} 🚀`);
       console.log(`Database: MongoDB (pH · TDS · Turbidity only)`);
       console.log(`Sensor simulation active (every hour, slight realistic drift)`);
       console.log(`WebSocket ready for real-time updates`);
     });
-  } catch (err) {
-    console.error('Failed to start backend:', err);
-    process.exit(1);
   }
-})();
+})().catch((err) => {
+  console.error('Failed to start backend:', err);
+  // Local boot failure is fatal; on Vercel the readiness middleware returns 500s.
+  if (!process.env.VERCEL) process.exit(1);
+});
+
+// Vercel Express entry point (backend service, framework: express)
+module.exports = app;

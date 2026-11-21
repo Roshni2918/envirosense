@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import API_URL from "./config";
 
 const NotificationBell = ({ socket, token, t, i18n }) => {
   const [notifications, setNotifications] = useState([]);
@@ -9,7 +10,7 @@ const NotificationBell = ({ socket, token, t, i18n }) => {
   useEffect(() => {
     const fetchNotifs = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/alerts/unresolved", {
+        const res = await fetch(`${API_URL}/api/alerts/unresolved`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();

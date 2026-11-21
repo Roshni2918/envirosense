@@ -17,6 +17,8 @@ async function connect() {
   // Indexes that mirror the old MySQL indexes (best-effort, never fatal)
   const indexes = [
     ['sensor_readings', { recorded_at: -1 }],
+    // Prevents duplicate hourly slots when the on-read backfill runs concurrently
+    ['sensor_readings', { recorded_at: 1 }, { unique: true }],
     ['sensor_readings', { sensor_id: 1 }],
     ['alerts', { generated_at: -1 }],
     ['alerts', { alert_status: 1, parameter_name: 1 }],

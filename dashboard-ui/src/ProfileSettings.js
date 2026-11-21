@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import API_URL from "./config";
 
 const ProfileSettings = ({ t, token, user, onClose, onUpdate }) => {
   const [name, setName] = useState(user.name || '');
@@ -14,7 +15,7 @@ const ProfileSettings = ({ t, token, user, onClose, onUpdate }) => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/profile", {
+        const res = await fetch(`${API_URL}/api/profile`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -32,7 +33,7 @@ const ProfileSettings = ({ t, token, user, onClose, onUpdate }) => {
   const updateProfile = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/profile", {
+      const res = await fetch(`${API_URL}/api/profile`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name, phone, village_name: village, language_preference: language })
       });
@@ -48,7 +49,7 @@ const ProfileSettings = ({ t, token, user, onClose, onUpdate }) => {
     if (newPassword.length < 4) return setMessage({ type: 'error', text: 'Password must be at least 4 characters' });
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/change-password", {
+      const res = await fetch(`${API_URL}/api/change-password`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ currentPassword, newPassword })
       });

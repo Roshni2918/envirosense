@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import API_URL from "./config";
 
 const SW_URL = '/service-worker.js';
 
@@ -28,7 +29,7 @@ export default function usePushNotifications(token) {
       let sub = await reg.pushManager.getSubscription();
       if (sub) return;
 
-      const res = await fetch('http://localhost:5000/api/push/vapid-public-key');
+      const res = await fetch(`${API_URL}/api/push/vapid-public-key`);
       const { publicKey } = await res.json();
       const convertedKey = Uint8Array.from(atob(publicKey), (c) => c.charCodeAt(0));
 
@@ -37,7 +38,7 @@ export default function usePushNotifications(token) {
         applicationServerKey: convertedKey
       });
 
-      await fetch('http://localhost:5000/api/push/subscribe', {
+      await fetch(`${API_URL}/api/push/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ subscription: sub.toJSON(), userId: token ? 'authenticated' : 'anonymous' })
@@ -59,7 +60,7 @@ export default function usePushNotifications(token) {
       const endpoint = sub.endpoint;
       await sub.unsubscribe();
 
-      await fetch('http://localhost:5000/api/push/unsubscribe', {
+      await fetch(`${API_URL}/api/push/unsubscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ endpoint })

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import API_URL from "./config";
 import { useTranslation } from "react-i18next";
 
 const ReportIssue = ({ onClose }) => {
@@ -16,13 +17,13 @@ const ReportIssue = ({ onClose }) => {
   const token = localStorage.getItem("token");
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/water-sources")
+    fetch(`${API_URL}/api/water-sources`)
       .then((res) => res.json())
       .then((data) => { if (data.data) setSources(data.data); })
       .catch(() => {});
 
     if (token) {
-      fetch("http://localhost:5000/api/community-reports", { headers: { Authorization: `Bearer ${token}` } })
+      fetch(`${API_URL}/api/community-reports`, { headers: { Authorization: `Bearer ${token}` } })
         .then((res) => res.json())
         .then((data) => { if (data.data) setMyReports(data.data); })
         .catch(() => {});
@@ -50,7 +51,7 @@ const ReportIssue = ({ onClose }) => {
     if (photo) form.append('photo', photo);
 
     try {
-      const res = await fetch("http://localhost:5000/api/community-reports", {
+      const res = await fetch(`${API_URL}/api/community-reports`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form
@@ -143,7 +144,7 @@ const ReportIssue = ({ onClose }) => {
                 display: "flex", gap: 10, alignItems: "flex-start"
               }}>
                 {r.photo_url && (
-                  <img src={`http://localhost:5000${r.photo_url}`} alt="report"
+                  <img src={`${API_URL}${r.photo_url}`} alt="report"
                     style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 8 }} />
                 )}
                 <div style={{ flex: 1 }}>
