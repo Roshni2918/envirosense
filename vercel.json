@@ -1,12 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
+    "backend": {
+      "root": "backend",
+      "framework": "express"
+    },
     "dashboard-ui": {
       "root": "dashboard-ui",
       "framework": "create-react-app"
     }
   },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "backend" } },
+    { "source": "/api", "destination": { "service": "backend" } },
     { "source": "/(.*)", "destination": { "service": "dashboard-ui" } }
+  ],
+  "crons": [
+    { "path": "/api/cron/insert-reading", "schedule": "0 18 * * *" }
   ]
 }

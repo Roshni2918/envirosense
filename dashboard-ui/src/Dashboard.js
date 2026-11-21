@@ -15,7 +15,7 @@ import ReportIssue from "./ReportIssue";
 import usePushNotifications from "./usePushNotifications";
 import "./App.css";
 
-const socket = io(API_URL || undefined); // auto-reconnect: the Render backend supports WebSockets
+const socket = io(API_URL || undefined, { reconnection: API_URL !== '' }); // Vercel has no WebSockets: one attempt, then polling
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -251,6 +251,7 @@ const Dashboard = () => {
     setLiveStatus('connected');
     socket.on('connect', () => setLiveStatus('connected'));
     socket.on('disconnect', () => setLiveStatus('disconnected'));
+    socket.on('connect_error', () => setLiveStatus('polling'));
     socket.on('sensor-update', (data) => {
       if (data) {
         setPrevData(latestData);
@@ -346,11 +347,11 @@ const Dashboard = () => {
           <p style={{ fontSize: 11, color: "#64748b" }}>{user.name || "User"}</p>
           <span style={{
             display: 'inline-block', fontSize: 9, padding: '2px 8px', borderRadius: 8,
-            background: liveStatus === 'connected' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-            color: liveStatus === 'connected' ? '#10b981' : '#ef4444',
+            background: liveStatus === 'connected' ? 'rgba(16,185,129,0.15)' : liveStatus === 'polling' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+            color: liveStatus === 'connected' ? '#10b981' : liveStatus === 'polling' ? '#f59e0b' : '#ef4444',
             fontWeight: 600, marginTop: 4
           }}>
-            {liveStatus === 'connected' ? `● ${t("live")}` : '○ Offline'}
+            {liveStatus === 'connected' ? `● ${t("live")}` : liveStatus === 'polling' ? `○ ${t("polling")}` : '○ Offline'}
           </span>
         </div>
         <ul>

@@ -143,8 +143,8 @@ const ReportIssue = ({ onClose }) => {
                 border: "1px solid #e2e8f0", borderRadius: 10, padding: 10, marginBottom: 8,
                 display: "flex", gap: 10, alignItems: "flex-start"
               }}>
-                {r.photo_url && (
-                  <img src={`${API_URL}${r.photo_url}`} alt="report"
+                {r.report_id && (
+                  <img src={`/api/community-reports/${r.report_id}/photo`} alt="report"
                     style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 8 }} />
                 )}
                 <div style={{ flex: 1 }}>

@@ -522,10 +522,8 @@ function AdminDashboard() {
                       <td><strong>{r.category}</strong></td>
                       <td style={{ maxWidth: 220, fontSize: 12 }}>{r.description}</td>
                       <td>
-                        {r.photo_url
-                          ? <a href={`${API_URL}${r.photo_url}`} target="_blank" rel="noreferrer">
-                              <img src={`${API_URL}${r.photo_url}`} alt="report" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} />
-                            </a>
+                        {r.report_id
+                          ? <img src={`/api/community-reports/${r.report_id}/photo`} alt="report" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} />
                           : '-'}
                       </td>
                       <td><span style={{

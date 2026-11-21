@@ -132,6 +132,7 @@ const resources = {
 
       // Landing page
       offline: "OFFLINE",
+      polling: "POLLING",
       deployment: "Deployment", station: "Station",
       heroTitleA: "Real-Time", heroTitleB: "Water Quality", heroTitleC: "Monitoring",
       heroSubtitle: "Advanced IoT-powered system monitoring the health of Nagaon rivers and water sources with instant alerts, smart analytics, WebSocket real-time updates, and community-driven insights.",
@@ -325,6 +326,7 @@ const resources = {
 
       // Landing page
       offline: "ऑफलाइन",
+      polling: "पोलिंग",
       deployment: "डेप्लॉयमेंट", station: "स्टेशन",
       heroTitleA: "रिअल-टाइम", heroTitleB: "जल गुणवत्ता", heroTitleC: "निरीक्षण",
       heroSubtitle: "नागाव नद्या व जलस्रोतांचे आरोग्य तात्काळ सूचना, स्मार्ट विश्लेषण, WebSocket रिअल-टाइम अपडेट आणि समुदाय-चालित सूचनांसह निरीक्षण करणारी प्रगत IoT-चालित प्रणाली.",

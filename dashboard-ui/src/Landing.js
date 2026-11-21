@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { io } from "socket.io-client";
 import WaterSourcesMap from "./WaterSourcesMap";
 
-const socket = io(API_URL || undefined); // auto-reconnect: the Render backend supports WebSockets
+const socket = io(API_URL || undefined, { reconnection: API_URL !== '' }); // Vercel has no WebSockets: one attempt, then polling
 
 function Landing() {
   const navigate = useNavigate();
@@ -40,6 +40,7 @@ function Landing() {
     setLiveStatus('connected');
     socket.on('connect', () => setLiveStatus('connected'));
     socket.on('disconnect', () => setLiveStatus('disconnected'));
+    socket.on('connect_error', () => setLiveStatus('polling'));
     socket.on('sensor-update', (data) => {
       if (data) {
         setStats(prev => ({ ...prev, readings: prev.readings + 1 }));
@@ -101,7 +102,7 @@ function Landing() {
         </div>
         <div className="hero-content">
           <div className="hero-badge">
-            {liveStatus === 'connected' ? `● ${t('live')}` : `○ ${t('offline')}`} · v2.0 Industry Edition
+            {liveStatus === 'connected' ? `● ${t('live')}` : liveStatus === 'polling' ? `○ ${t('polling')}` : `○ ${t('offline')}`} · v2.0 Industry Edition
           </div>
           <h1 className="hero-title">{t("heroTitleA")} <span className="gradient-text">{t("heroTitleB")}</span> {t("heroTitleC")}</h1>
           <p className="hero-subtitle">{t("heroSubtitle")}</p>

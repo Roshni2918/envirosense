@@ -89,4 +89,17 @@ function presentAll(docs, idKey) {
   return (docs || []).map((d) => present(d, idKey));
 }
 
-module.exports = { connect, getDb, collection, nextId, insertDoc, present, presentAll };
+// Upload a photo buffer for a report (idempotent — upserts so each report has at most one photo).
+async function uploadPhoto(reportId, buffer, contentType) {
+  await collection('community_report_photos').updateOne(
+    { report_id: reportId },
+    { $set: { data: buffer, contentType, created_at: new Date() } },
+    { upsert: true }
+  );
+}
+async function getPhoto(reportId) {
+  const doc = await collection('community_report_photos').findOne({ report_id: reportId });
+  return doc ? { data: doc.data, contentType: doc.contentType } : null;
+}
+
+module.exports = { connect, getDb, collection, nextId, insertDoc, present, presentAll, uploadPhoto, getPhoto };
