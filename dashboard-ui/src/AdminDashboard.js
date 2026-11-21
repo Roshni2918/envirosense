@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler } from "chart.js";
-import { Line } from "react-chartjs-2";
 import jsPDF from "jspdf";
 import WaterSourcesMap from "./WaterSourcesMap";
 import "./App.css";
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler);
 
 function AdminDashboard() {
   const navigate = useNavigate();
@@ -18,11 +14,11 @@ function AdminDashboard() {
   const [sensorData, setSensorData] = useState([]);
   const [users, setUsers] = useState([]);
   const [alerts, setAlerts] = useState([]);
-  const [settings, setSettings] = useState([]);
   const [queries, setQueries] = useState([]);
+  const [communityReports, setCommunityReports] = useState([]);
+  const [subscribers, setSubscribers] = useState([]);
 
   const [loading, setLoading] = useState(true);
-  const [chartData, setChartData] = useState(null);
   const [reportStartDate, setReportStartDate] = useState("");
   const [reportEndDate, setReportEndDate] = useState("");
   const [stats, setStats] = useState({ totalReadings: 0, totalUsers: 0, activeAlerts: 0, pendingQueries: 0, activeSources: 0, todayReadings: 0 });
@@ -35,7 +31,7 @@ function AdminDashboard() {
   };
 
   const getParamStatus = (paramName, value) => {
-    const ranges = { ph: { min: 6.5, max: 8.5 }, tds: { min: 50, max: 300 }, turbidity: { min: 0, max: 5 }, dissolved_oxygen: { min: 5, max: 8 }, temperature: { min: 20, max: 30 }, water_level: { min: 40, max: 100 } };
+    const ranges = { ph: { min: 6.5, max: 8.5 }, tds: { min: 50, max: 300 }, turbidity: { min: 0, max: 5 } };
     const range = ranges[paramName];
     if (!range) return 'safe';
     return (value < range.min || value > range.max) ? 'unsafe' : 'safe';
@@ -47,14 +43,6 @@ function AdminDashboard() {
       const data = await res.json();
       if (data.data) {
         setSensorData(data.data);
-        const reversed = [...data.data].reverse();
-        setChartData({
-          labels: reversed.map(r => new Date(r.recorded_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
-          datasets: [
-            { label: "pH", data: reversed.map(r => r.ph), borderColor: "#0ea5e9", backgroundColor: "rgba(14,165,233,0.1)", fill: true, tension: 0.4, pointRadius: 2 },
-            { label: "Temperature", data: reversed.map(r => r.temperature), borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.1)", fill: true, tension: 0.4, pointRadius: 2, yAxisID: "y1" }
-          ]
-        });
       }
     } catch (e) { console.error(e); }
   };
@@ -72,14 +60,6 @@ function AdminDashboard() {
       const res = await fetch("http://localhost:5000/api/alerts", { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (data.data) setAlerts(data.data);
-    } catch (e) { console.error(e); }
-  };
-
-  const fetchSettings = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/settings");
-      const data = await res.json();
-      if (data.data) setSettings(data.data);
     } catch (e) { console.error(e); }
   };
 
@@ -106,10 +86,38 @@ function AdminDashboard() {
     } catch (e) { console.error(e); }
   };
 
+  const fetchCommunityReports = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/community-reports/all", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.data) setCommunityReports(data.data);
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchSubscribers = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/alert-subscribers", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.data) setSubscribers(data.data);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleUpdateReport = async (id, status) => {
+    const note = status === 'Resolved'
+      ? window.prompt('Add a short note for the user (optional):') || 'Issue resolved by the water authority'
+      : null;
+    await fetch(`http://localhost:5000/api/community-reports/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status, admin_note: note })
+    });
+    fetchCommunityReports();
+  };
+
   useEffect(() => {
     const loadAll = async () => {
       setLoading(true);
-      await Promise.all([fetchLatestData(), fetchSensorData(), fetchUsers(), fetchAlerts(), fetchSettings(), fetchQueries(), fetchStats()]);
+      await Promise.all([fetchLatestData(), fetchSensorData(), fetchUsers(), fetchAlerts(), fetchQueries(), fetchStats(), fetchCommunityReports(), fetchSubscribers()]);
       setLoading(false);
     };
     loadAll();
@@ -137,17 +145,15 @@ function AdminDashboard() {
     fetchAlerts();
   };
 
+  const handleDeleteSubscriber = async (id) => {
+    if (!window.confirm("Remove this subscriber from critical alerts?")) return;
+    await fetch(`http://localhost:5000/api/alert-subscribers/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    fetchSubscribers();
+  };
+
   const handleResolveQuery = async (id) => {
     await fetch(`http://localhost:5000/api/queries/${id}/resolve`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
     fetchQueries();
-  };
-
-  const updateSetting = async (id, min_value, max_value) => {
-    await fetch(`http://localhost:5000/api/settings/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ min_value: parseFloat(min_value), max_value: parseFloat(max_value) })
-    });
-    fetchSettings();
   };
 
   const generatePDFReport = async () => {
@@ -167,24 +173,20 @@ function AdminDashboard() {
       doc.text(`Total Readings: ${rows.length}`, 20, 51);
 
       let y = 62; doc.setFontSize(7);
-      const headers = ["#", "Date & Time", "pH", "St", "TDS", "St", "Turb", "St", "DO", "St", "Temp", "St", "W.Lvl", "St", "Overall"];
-      const colX = [8, 18, 40, 48, 58, 66, 76, 84, 94, 102, 112, 120, 130, 138, 148];
+      const headers = ["#", "Date & Time", "pH", "St", "TDS", "St", "Turb", "St", "Overall"];
+      const colX = [8, 18, 45, 53, 63, 71, 81, 89, 100];
       headers.forEach((h, i) => doc.text(h, colX[i], y));
 
       y += 5;
       rows.forEach((row, i) => {
         const safe = (p, v) => getParamStatus(p, v) === 'safe';
-        const allSafe = safe('ph', row.ph) && safe('tds', row.tds) && safe('turbidity', row.turbidity) &&
-          safe('dissolved_oxygen', row.dissolved_oxygen) && safe('temperature', row.temperature) && safe('water_level', row.water_level);
+        const allSafe = safe('ph', row.ph) && safe('tds', row.tds) && safe('turbidity', row.turbidity);
         doc.text(String(i + 1), colX[0], y);
         doc.text(new Date(row.recorded_at).toLocaleString(), colX[1], y);
         doc.text(String(row.ph || '-'), colX[2], y); doc.text(safe('ph', row.ph) ? '✓' : '✗', colX[3], y);
         doc.text(String(row.tds || '-'), colX[4], y); doc.text(safe('tds', row.tds) ? '✓' : '✗', colX[5], y);
         doc.text(String(row.turbidity || '-'), colX[6], y); doc.text(safe('turbidity', row.turbidity) ? '✓' : '✗', colX[7], y);
-        doc.text(String(row.dissolved_oxygen || '-'), colX[8], y); doc.text(safe('dissolved_oxygen', row.dissolved_oxygen) ? '✓' : '✗', colX[9], y);
-        doc.text(String(row.temperature || '-'), colX[10], y); doc.text(safe('temperature', row.temperature) ? '✓' : '✗', colX[11], y);
-        doc.text(String(row.water_level || '-'), colX[12], y); doc.text(safe('water_level', row.water_level) ? '✓' : '✗', colX[13], y);
-        doc.text(allSafe ? '✅ SAFE' : '⚠️ UNSAFE', colX[14], y);
+        doc.text(allSafe ? '✅ SAFE' : '⚠️ UNSAFE', colX[8], y);
         y += 4.5;
         if (y > 195) { doc.addPage(); y = 20; }
       });
@@ -194,12 +196,9 @@ function AdminDashboard() {
 
   const calcWQI = (data) => {
     const ranges = {
-      ph: { min: 6.5, max: 8.5, weight: 0.2 },
-      tds: { min: 50, max: 300, weight: 0.15 },
-      turbidity: { min: 0, max: 5, weight: 0.15 },
-      dissolved_oxygen: { min: 5, max: 8, weight: 0.2 },
-      temperature: { min: 20, max: 30, weight: 0.15 },
-      water_level: { min: 40, max: 100, weight: 0.15 }
+      ph: { min: 6.5, max: 8.5, weight: 0.4 },
+      tds: { min: 50, max: 300, weight: 0.3 },
+      turbidity: { min: 0, max: 5, weight: 0.3 }
     };
     let score = 0;
     for (const [key, r] of Object.entries(ranges)) {
@@ -218,10 +217,7 @@ function AdminDashboard() {
   const parameters = latestData ? [
     { key: 'ph', name: t("ph"), value: latestData.ph, status: getParamStatus('ph', latestData.ph) },
     { key: 'tds', name: t("tds"), value: latestData.tds, status: getParamStatus('tds', latestData.tds) },
-    { key: 'turbidity', name: t("turbidity"), value: latestData.turbidity, status: getParamStatus('turbidity', latestData.turbidity) },
-    { key: 'dissolved_oxygen', name: t("dissolvedOxygen"), value: latestData.dissolved_oxygen, status: getParamStatus('dissolved_oxygen', latestData.dissolved_oxygen) },
-    { key: 'temperature', name: t("temperature"), value: latestData.temperature, status: getParamStatus('temperature', latestData.temperature) },
-    { key: 'water_level', name: t("waterLevel"), value: latestData.water_level, status: getParamStatus('water_level', latestData.water_level) }
+    { key: 'turbidity', name: t("turbidity"), value: latestData.turbidity, status: getParamStatus('turbidity', latestData.turbidity) }
   ] : [];
 
   const overallSafe = parameters.every(p => p.status === 'safe');
@@ -237,8 +233,8 @@ function AdminDashboard() {
     { key: "users", icon: "👤", label: t("manageUsers") },
     { key: "alerts", icon: "🚨", label: t("viewAlerts") },
     { key: "queries", icon: "💬", label: "Queries" },
+    { key: "community", icon: "🏞️", label: t("communityReports") },
     { key: "reports", icon: "📋", label: t("generateReports") },
-    { key: "settings", icon: "⚙️", label: t("settings") },
     { key: "map", icon: "🗺️", label: "Map" }
   ];
 
@@ -260,9 +256,6 @@ function AdminDashboard() {
           <p style={{ fontSize: 11, color: "#64748b" }}>Admin</p>
         </div>
         <ul>
-          <li className={activeTab === "dashboard" ? "active" : ""} onClick={() => setActiveTab("dashboard")}>
-            <span>📊</span><span>Dashboard</span>
-          </li>
           {tabs.map(tab => (
             <li key={tab.key} className={activeTab === tab.key ? "active" : ""} onClick={() => setActiveTab(tab.key)}>
               <span>{tab.icon}</span><span>{tab.label}</span>
@@ -302,7 +295,7 @@ function AdminDashboard() {
         </div>
 
         <div className="admin-content glass-card">
-          {/* DASHBOARD TAB - 6 PARAMETER CARDS */}
+          {/* DASHBOARD TAB - 3 PARAMETER CARDS */}
           {activeTab === "dashboard" && (
             <div>
               {latestData && (
@@ -341,8 +334,7 @@ function AdminDashboard() {
                           {param.value}
                         </div>
                         <div className="param-unit">
-                          {param.key === 'ph' ? 'pH' : param.key === 'tds' ? 'ppm' : param.key === 'turbidity' ? 'NTU' :
-                           param.key === 'dissolved_oxygen' ? 'mg/L' : param.key === 'temperature' ? '°C' : '%'}
+                          {param.key === 'ph' ? 'pH' : param.key === 'tds' ? 'ppm' : 'NTU'}
                         </div>
                         <div className={`param-status ${param.status}`}>
                           {param.status === 'safe' ? '✅ Safe' : '⚠️ Unsafe'}
@@ -375,35 +367,20 @@ function AdminDashboard() {
           )}
 
           {/* SENSORS TAB */}
-          {activeTab === "sensors" && chartData && (
-            <div>
-              <div style={{ marginBottom: 20 }}>
-                <h3>📊 pH & Temperature Trends</h3>
-                <Line data={chartData} options={{
-                  responsive: true, interaction: { mode: "index", intersect: false },
-                  plugins: { legend: { position: "top", labels: { usePointStyle: true } } },
-                  scales: {
-                    x: { grid: { display: false } },
-                    y: { beginAtZero: false, title: { display: true, text: "pH" } },
-                    y1: { position: "right", beginAtZero: false, title: { display: true, text: "Temperature (°C)" }, grid: { display: false } }
-                  }
-                }} />
-              </div>
-              <div className="table-container">
-                <h2>📋 Recent Sensor Readings</h2>
-                <table>
-                  <thead><tr><th>Date & Time</th><th>pH</th><th>TDS</th><th>Turbidity</th><th>DO</th><th>Temp</th><th>W.Level</th></tr></thead>
-                  <tbody>
-                    {sensorData.slice(0, 15).map((row, i) => (
-                      <tr key={i}>
-                        <td>{new Date(row.recorded_at).toLocaleString()}</td>
-                        <td>{row.ph}</td><td>{row.tds}</td><td>{row.turbidity}</td>
-                        <td>{row.dissolved_oxygen}</td><td>{row.temperature}</td><td>{row.water_level}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          {activeTab === "sensors" && (
+            <div className="table-container">
+              <h2>📋 Recent Sensor Readings</h2>
+              <table>
+                <thead><tr><th>Date & Time</th><th>pH</th><th>TDS</th><th>Turbidity</th></tr></thead>
+                <tbody>
+                  {sensorData.slice(0, 15).map((row, i) => (
+                    <tr key={i}>
+                      <td>{new Date(row.recorded_at).toLocaleString()}</td>
+                      <td>{row.ph}</td><td>{row.tds}</td><td>{row.turbidity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
@@ -465,6 +442,36 @@ function AdminDashboard() {
             </div>
           )}
 
+          {/* ALERT SUBSCRIBERS (registered for critical email / SMS) */}
+          {activeTab === "alerts" && (
+            <div className="table-container" style={{ marginTop: 20 }}>
+              <h2>🔔 Alert Subscribers ({subscribers.length})</h2>
+              <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 12px' }}>
+                Extra recipients beyond the user accounts (added via the API, e.g. villagers without
+                app accounts) — they join all registered users in receiving critical email/SMS alerts.
+              </p>
+              {subscribers.length === 0 ? (
+                <p style={{ fontSize: 13, color: '#94a3b8' }}>No subscribers yet.</p>
+              ) : (
+                <table>
+                  <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Mobile</th><th>Registered</th><th>Action</th></tr></thead>
+                  <tbody>
+                    {subscribers.map(s => (
+                      <tr key={s.subscriber_id}>
+                        <td>{s.subscriber_id}</td>
+                        <td>{s.name}</td>
+                        <td>{s.email}</td>
+                        <td>{s.mobile || '—'}</td>
+                        <td style={{ fontSize: 12 }}>{new Date(s.created_at).toLocaleString()}</td>
+                        <td><button className="btn-sm btn-danger" onClick={() => handleDeleteSubscriber(s.subscriber_id)}>Remove</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
           {/* QUERIES TAB */}
           {activeTab === "queries" && (
             <div className="table-container">
@@ -491,6 +498,56 @@ function AdminDashboard() {
             </div>
           )}
 
+          {/* COMMUNITY REPORTS TAB */}
+          {activeTab === "community" && (
+            <div className="table-container">
+              <h2>🏞️ {t("communityReports")}</h2>
+              <p style={{ fontSize: 13, color: '#64748b', marginTop: 0 }}>
+                {t("communityReportsHint")}
+              </p>
+              <table>
+                <thead>
+                  <tr><th>ID</th><th>User</th><th>Source</th><th>Category</th><th>Description</th><th>Photo</th><th>{t("status")}</th><th>Time</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                  {communityReports.length === 0 && (
+                    <tr><td colSpan="9" style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>{t("noData")}</td></tr>
+                  )}
+                  {communityReports.map((r) => (
+                    <tr key={r.report_id}>
+                      <td>{r.report_id}</td>
+                      <td>{r.user_name}<div style={{ fontSize: 11, color: '#64748b' }}>{r.user_email}</div></td>
+                      <td>{r.source_name || '-'}</td>
+                      <td><strong>{r.category}</strong></td>
+                      <td style={{ maxWidth: 220, fontSize: 12 }}>{r.description}</td>
+                      <td>
+                        {r.photo_url
+                          ? <a href={`http://localhost:5000${r.photo_url}`} target="_blank" rel="noreferrer">
+                              <img src={`http://localhost:5000${r.photo_url}`} alt="report" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} />
+                            </a>
+                          : '-'}
+                      </td>
+                      <td><span style={{
+                        padding: '2px 10px', borderRadius: 10, fontSize: 12, fontWeight: 600,
+                        background: r.status === 'Pending' ? '#fef3c7' : r.status === 'Resolved' ? '#d1fae5' : '#e2e8f0',
+                        color: r.status === 'Pending' ? '#92400e' : r.status === 'Resolved' ? '#065f46' : '#334155'
+                      }}>{r.status}</span></td>
+                      <td style={{ fontSize: 12 }}>{new Date(r.created_at).toLocaleString()}</td>
+                      <td style={{ display: 'flex', gap: 6 }}>
+                        {r.status !== 'Resolved' && (
+                          <button className="btn-sm btn-success" onClick={() => handleUpdateReport(r.report_id, 'Resolved')}>{t("resolve")}</button>
+                        )}
+                        {r.status !== 'Dismissed' && (
+                          <button className="btn-sm" onClick={() => handleUpdateReport(r.report_id, 'Dismissed')}>{t("dismiss")}</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* REPORTS TAB */}
           {activeTab === "reports" && (
             <div>
@@ -504,37 +561,12 @@ function AdminDashboard() {
             </div>
           )}
 
-          {/* SETTINGS TAB */}
-          {activeTab === "settings" && (
-            <div>
-              <h3 style={{ marginBottom: 16 }}>⚙️ {t("settings")}</h3>
-              <table>
-                <thead><tr><th>Parameter</th><th>Min Value</th><th>Max Value</th><th>Unit</th><th>Action</th></tr></thead>
-                <tbody>
-                  {settings.map(s => (
-                    <tr key={s.id}>
-                      <td><strong>{s.parameter_name}</strong></td>
-                      <td><input type="number" step="0.01" defaultValue={s.min_value}
-                        onBlur={e => updateSetting(s.id, e.target.value, s.max_value)}
-                        style={{ width: 80, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13 }} /></td>
-                      <td><input type="number" step="0.01" defaultValue={s.max_value}
-                        onBlur={e => updateSetting(s.id, s.min_value, e.target.value)}
-                        style={{ width: 80, padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13 }} /></td>
-                      <td>{s.unit}</td>
-                      <td><span style={{ fontSize: 12, color: '#10b981' }}>Auto-saved</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
           {/* MAP TAB */}
           {activeTab === "map" && (
             <div>
               <h3 style={{ marginBottom: 16 }}>🗺️ Deployment Map — Nagaon Region</h3>
               <p style={{ color: '#64748b', fontSize: 14, marginBottom: 20 }}>
-                Real monitoring stations across Nagaon, Ashta, Nagav, and Khanapur — click any source for Google Maps link
+                Real monitoring station in Nagaon — click the source for Google Maps link
               </p>
               <WaterSourcesMap t={t} i18n={i18n} />
             </div>

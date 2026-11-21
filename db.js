@@ -1,22 +1,25 @@
-// db.js
-const mysql = require("mysql2");
+// db.js — MongoDB connection (root helper, same config as backend/db.js)
+const { MongoClient } = require('mongodb');
+require('dotenv').config();
 
-// Create MySQL connection
-const db = mysql.createConnection({
-  host: "localhost",            // Localhost cha host
-  user: "root",                 // Tujha MySQL username
-  password: "2918",             // Tujha MySQL password
-  database: "envirosense_system", // Database name
-  ssl: false                    // <-- SSL disable kela
-});
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+const DB_NAME = process.env.DB_NAME || 'envirosense_system';
 
-// Connect to MySQL
-db.connect((err) => {
-  if (err) {
-    console.log("MySQL Connection Error:", err);
-  } else {
-    console.log("MySQL Connected ✅");
-  }
-});
+let client = null;
+let db = null;
 
-module.exports = db;
+async function connect() {
+  if (db) return db;
+  client = new MongoClient(MONGODB_URI);
+  await client.connect();
+  db = client.db(DB_NAME);
+  console.log(`MongoDB Connected ✅ (${DB_NAME} @ ${MONGODB_URI})`);
+  return db;
+}
+
+function getDb() {
+  if (!db) throw new Error('MongoDB not connected — call connect() first');
+  return db;
+}
+
+module.exports = { connect, getDb, MONGODB_URI, DB_NAME };

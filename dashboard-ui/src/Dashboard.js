@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler } from "chart.js";
-import { Line } from "react-chartjs-2";
 import { io } from "socket.io-client";
 import jsPDF from "jspdf";
 import SuggestionForm from "./SuggestionForm";
@@ -11,10 +9,10 @@ import EmergencyAlert from "./EmergencyAlert";
 import WaterCalendar from "./WaterCalendar";
 import ProfileSettings from "./ProfileSettings";
 import WaterSourcesMap from "./WaterSourcesMap";
+import ForecastCard from "./ForecastCard";
+import ReportIssue from "./ReportIssue";
 import usePushNotifications from "./usePushNotifications";
 import "./App.css";
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler);
 
 const socket = io("http://localhost:5000");
 
@@ -25,10 +23,10 @@ const Dashboard = () => {
   const [sensorHistory, setSensorHistory] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [chartData, setChartData] = useState(null);
   const [activePanel, setActivePanel] = useState("dashboard");
   const [showSuggestion, setShowSuggestion] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [systemHealth, setSystemHealth] = useState(null);
   const [healthLoading] = useState(true);
 
@@ -46,10 +44,9 @@ const Dashboard = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [prevData, setPrevData] = useState(null);
 
-  const { pushSupported, permissionState, subscribed, requestPermission, unsubscribe } = usePushNotifications(token);
-
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const { pushSupported, permissionState, subscribed, requestPermission, unsubscribe } = usePushNotifications(token);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
@@ -84,12 +81,9 @@ const Dashboard = () => {
 
   const calcWQI = (data) => {
     const ranges = {
-      ph: { min: 6.5, max: 8.5, weight: 0.2 },
-      tds: { min: 50, max: 300, weight: 0.15 },
-      turbidity: { min: 0, max: 5, weight: 0.15 },
-      dissolved_oxygen: { min: 5, max: 8, weight: 0.2 },
-      temperature: { min: 20, max: 30, weight: 0.15 },
-      water_level: { min: 40, max: 100, weight: 0.15 }
+      ph: { min: 6.5, max: 8.5, weight: 0.4 },
+      tds: { min: 50, max: 300, weight: 0.3 },
+      turbidity: { min: 0, max: 5, weight: 0.3 }
     };
     let score = 0;
     for (const [key, r] of Object.entries(ranges)) {
@@ -104,10 +98,38 @@ const Dashboard = () => {
   };
 
   const getParamStatus = (paramName, value) => {
-    const ranges = { ph: { min: 6.5, max: 8.5 }, tds: { min: 50, max: 300 }, turbidity: { min: 0, max: 5 }, dissolved_oxygen: { min: 5, max: 8 }, temperature: { min: 20, max: 30 }, water_level: { min: 40, max: 100 } };
+    const ranges = { ph: { min: 6.5, max: 8.5 }, tds: { min: 50, max: 300 }, turbidity: { min: 0, max: 5 } };
     const range = ranges[paramName];
     if (!range) return 'safe';
     return (value < range.min || value > range.max) ? 'unsafe' : 'safe';
+  };
+
+  // Overall status for one reading: safe / unsafe / critical
+  // (critical uses the same severity rule as the backend alert engine)
+  const getRowStatus = (row) => {
+    const ranges = { ph: { min: 6.5, max: 8.5 }, tds: { min: 50, max: 300 }, turbidity: { min: 0, max: 5 } };
+    let critical = false;
+    let unsafe = false;
+    for (const key of Object.keys(ranges)) {
+      const range = ranges[key];
+      const value = Number(row[key]);
+      if (value === undefined || value === null || isNaN(value)) continue;
+      if (value < range.min * 0.4 || value > range.max * 1.6) critical = true;
+      else if (value < range.min || value > range.max) unsafe = true;
+    }
+    return critical ? 'critical' : unsafe ? 'unsafe' : 'safe';
+  };
+
+  const rowStatusBadge = (row) => {
+    const status = getRowStatus(row);
+    const label = status === 'critical' ? '🚨 Critical' : status === 'unsafe' ? '⚠️ Unsafe' : '✅ Safe';
+    const color = status === 'critical' ? '#dc2626' : status === 'unsafe' ? '#b45309' : '#10b981';
+    const bg = status === 'critical' ? '#fef2f2' : status === 'unsafe' ? '#fffbeb' : '#ecfdf5';
+    return (
+      <span style={{ padding: '2px 10px', borderRadius: 10, fontSize: 12, fontWeight: 600, background: bg, color, whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+    );
   };
 
   const fetchLatestData = async () => {
@@ -124,15 +146,6 @@ const Dashboard = () => {
       const data = await res.json();
       if (data.data) {
         setSensorHistory(data.data);
-        const reversed = [...data.data].reverse();
-        setChartData({
-          labels: reversed.map(r => new Date(r.recorded_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
-          datasets: [
-            { label: "pH", data: reversed.map(r => r.ph), borderColor: "#0ea5e9", backgroundColor: "rgba(14,165,233,0.08)", fill: true, tension: 0.4, pointRadius: 2 },
-            { label: "TDS", data: reversed.map(r => r.tds), borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.08)", fill: true, tension: 0.4, pointRadius: 2, yAxisID: "y1" },
-            { label: "Turbidity", data: reversed.map(r => r.turbidity), borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.08)", fill: true, tension: 0.4, pointRadius: 2, yAxisID: "y2" }
-          ]
-        });
       }
     } catch (e) { console.error(e); }
   };
@@ -174,8 +187,8 @@ const Dashboard = () => {
     doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 37);
     doc.text(`User: ${user.name || "N/A"}`, 20, 44);
     let y = 55; doc.setFontSize(8);
-    const headers = ["Date & Time", "pH", "Status", "TDS", "Status", "Turbidity", "Status", "DO", "Status", "Temp", "Status", "Water Level", "Status"];
-    const cols = [20, 50, 65, 80, 95, 110, 125, 140, 155, 170, 185, 200, 215];
+    const headers = ["Date & Time", "pH", "Status", "TDS", "Status", "Turbidity", "Status"];
+    const cols = [20, 55, 75, 95, 115, 135, 160];
     headers.forEach((h, i) => doc.text(h, cols[i], y));
     y += 6;
     historyData.forEach((row) => {
@@ -184,9 +197,6 @@ const Dashboard = () => {
       doc.text(String(row.ph || "-"), cols[1], y); doc.text(isSafe('ph', row.ph) ? "Safe" : "Unsafe", cols[2], y);
       doc.text(String(row.tds || "-"), cols[3], y); doc.text(isSafe('tds', row.tds) ? "Safe" : "Unsafe", cols[4], y);
       doc.text(String(row.turbidity || "-"), cols[5], y); doc.text(isSafe('turbidity', row.turbidity) ? "Safe" : "Unsafe", cols[6], y);
-      doc.text(String(row.dissolved_oxygen || "-"), cols[7], y); doc.text(isSafe('dissolved_oxygen', row.dissolved_oxygen) ? "Safe" : "Unsafe", cols[8], y);
-      doc.text(String(row.temperature || "-"), cols[9], y); doc.text(isSafe('temperature', row.temperature) ? "Safe" : "Unsafe", cols[10], y);
-      doc.text(String(row.water_level || "-"), cols[11], y); doc.text(isSafe('water_level', row.water_level) ? "Safe" : "Unsafe", cols[12], y);
       y += 6;
       if (y > 190) { doc.addPage(); y = 20; }
     });
@@ -203,6 +213,27 @@ const Dashboard = () => {
       a.click(); URL.revokeObjectURL(url);
     } catch { alert("Failed to download CSV"); }
   };
+
+  const downloadFile = async (path, extension) => {
+    try {
+      const params = (historyStart && historyEnd) ? `?start_date=${historyStart}&end_date=${historyEnd}` : '';
+      const res = await fetch(`http://localhost:5000${path}${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `water-quality-${historyStart || 'all'}.${extension}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('success', `✅ ${extension.toUpperCase()} downloaded`);
+    } catch {
+      alert(`Failed to download ${extension.toUpperCase()}`);
+    }
+  };
+
+  const downloadXLSX = () => downloadFile('/api/export/xlsx', 'xlsx');
+  const downloadJSON = () => downloadFile('/api/export/json', 'json');
 
   useEffect(() => {
     const loadData = async () => {
@@ -275,10 +306,7 @@ const Dashboard = () => {
   const parameters = latestData ? [
     { key: 'ph', name: t("ph"), value: latestData.ph, status: getParamStatus('ph', latestData.ph) },
     { key: 'tds', name: t("tds"), value: latestData.tds, status: getParamStatus('tds', latestData.tds) },
-    { key: 'turbidity', name: t("turbidity"), value: latestData.turbidity, status: getParamStatus('turbidity', latestData.turbidity) },
-    { key: 'dissolved_oxygen', name: t("dissolvedOxygen"), value: latestData.dissolved_oxygen, status: getParamStatus('dissolved_oxygen', latestData.dissolved_oxygen) },
-    { key: 'temperature', name: t("temperature"), value: latestData.temperature, status: getParamStatus('temperature', latestData.temperature) },
-    { key: 'water_level', name: t("waterLevel"), value: latestData.water_level, status: getParamStatus('water_level', latestData.water_level) }
+    { key: 'turbidity', name: t("turbidity"), value: latestData.turbidity, status: getParamStatus('turbidity', latestData.turbidity) }
   ] : [];
 
   const overallSafe = parameters.every(p => p.status === 'safe');
@@ -331,6 +359,7 @@ const Dashboard = () => {
             </li>
           ))}
           <li onClick={() => setShowSuggestion(true)}><span>💬</span> <span>Suggestions</span></li>
+          <li onClick={() => setShowReport(true)}><span>🏞</span> <span>{t("reportIssue")}</span></li>
           <li onClick={() => setShowProfile(true)}><span>⚙️</span> <span>{t("profileSettings")}</span></li>
           <li onClick={() => navigate("/")}><span>🏠</span> <span>{t("home")}</span></li>
         </ul>
@@ -408,6 +437,8 @@ const Dashboard = () => {
                   <>
                     <button className="btn-glass" onClick={downloadHistoryPDF}>📥 PDF</button>
                     <button className="btn-glass" onClick={downloadCSV}>📊 CSV</button>
+                    <button className="btn-glass" onClick={downloadXLSX}>📗 Excel</button>
+                    <button className="btn-glass" onClick={downloadJSON}>🧾 JSON</button>
                   </>
                 )}
               </div>
@@ -419,8 +450,7 @@ const Dashboard = () => {
                   <thead>
                     <tr>
                       <th>Date & Time</th><th>pH</th><th>Status</th><th>TDS</th><th>Status</th>
-                      <th>Turbidity</th><th>Status</th><th>DO</th><th>Status</th>
-                      <th>Temp</th><th>Status</th><th>W.Level</th><th>Status</th>
+                      <th>Turbidity</th><th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -438,18 +468,6 @@ const Dashboard = () => {
                         <td>{row.turbidity}</td>
                         <td style={{ color: getParamStatus('turbidity', row.turbidity) === 'safe' ? '#10b981' : '#ef4444', fontWeight: 600, fontSize: 12 }}>
                           {getParamStatus('turbidity', row.turbidity) === 'safe' ? '✅' : '⚠️'}
-                        </td>
-                        <td>{row.dissolved_oxygen}</td>
-                        <td style={{ color: getParamStatus('dissolved_oxygen', row.dissolved_oxygen) === 'safe' ? '#10b981' : '#ef4444', fontWeight: 600, fontSize: 12 }}>
-                          {getParamStatus('dissolved_oxygen', row.dissolved_oxygen) === 'safe' ? '✅' : '⚠️'}
-                        </td>
-                        <td>{row.temperature}</td>
-                        <td style={{ color: getParamStatus('temperature', row.temperature) === 'safe' ? '#10b981' : '#ef4444', fontWeight: 600, fontSize: 12 }}>
-                          {getParamStatus('temperature', row.temperature) === 'safe' ? '✅' : '⚠️'}
-                        </td>
-                        <td>{row.water_level}</td>
-                        <td style={{ color: getParamStatus('water_level', row.water_level) === 'safe' ? '#10b981' : '#ef4444', fontWeight: 600, fontSize: 12 }}>
-                          {getParamStatus('water_level', row.water_level) === 'safe' ? '✅' : '⚠️'}
                         </td>
                       </tr>
                     ))}
@@ -595,8 +613,7 @@ const Dashboard = () => {
                     {param.value}
                   </div>
                   <div className="param-unit">
-                    {param.key === 'ph' ? 'pH' : param.key === 'tds' ? 'ppm' : param.key === 'turbidity' ? 'NTU' :
-                     param.key === 'dissolved_oxygen' ? 'mg/L' : param.key === 'temperature' ? '°C' : '%'}
+                    {param.key === 'ph' ? 'pH' : param.key === 'tds' ? 'ppm' : 'NTU'}
                   </div>
                   <div className={`param-status ${param.status}`}>
                     {param.status === 'safe' ? '✅ Safe' : '⚠️ Unsafe'}
@@ -639,51 +656,37 @@ const Dashboard = () => {
               </div>
             )}
 
-            {chartData && (
-              <div className="charts-row">
-                <div className="chart-card glass-card">
-                  <h3>📈 {t("real-time") || 'Real-Time Trends'}</h3>
-                  <Line data={chartData} options={{
-                    responsive: true, interaction: { mode: "index", intersect: false },
-                    plugins: { legend: { position: "top", labels: { usePointStyle: true, padding: 16, boxWidth: 8, font: { size: 11 } } } },
-                    scales: {
-                      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                      y: { beginAtZero: false, title: { display: true, text: "pH / Turbidity", font: { size: 11 } }, grid: { color: "rgba(0,0,0,0.04)" } },
-                      y1: { position: "right", beginAtZero: false, title: { display: true, text: "TDS (ppm)", font: { size: 11 } }, grid: { display: false } }
-                    }
-                  }} />
-                </div>
-                <div className="chart-card glass-card">
-                  <h3>🚨 {t("viewAlerts")}</h3>
-                  <div className="alert-feed">
-                    {alerts.length > 0 ? alerts.slice(0, 5).map((alert, i) => (
-                      <div key={i} className={`alert-item ${alert.alert_message_en?.includes('🚨') ? 'critical' : 'high'}`}>
-                        <span className="alert-icon">⚠️</span>
-                        <div className="alert-text">
-                          <strong>{alert.parameter_name}</strong>
-                          <span>{i18n.language === 'en' ? alert.alert_message_en : alert.alert_message_mr}</span>
-                        </div>
-                      </div>
-                    )) : (
-                      <div className="no-alerts">✅ No active alerts. Water quality is normal.</div>
-                    )}
+            <ForecastCard readings={sensorHistory} t={t} />
+
+            <div className="chart-card glass-card" style={{ marginBottom: 24 }}>
+              <h3>🚨 {t("viewAlerts")}</h3>
+              <div className="alert-feed">
+                {alerts.length > 0 ? alerts.slice(0, 5).map((alert, i) => (
+                  <div key={i} className={`alert-item ${alert.alert_message_en?.includes('🚨') ? 'critical' : 'high'}`}>
+                    <span className="alert-icon">⚠️</span>
+                    <div className="alert-text">
+                      <strong>{alert.parameter_name}</strong>
+                      <span>{i18n.language === 'en' ? alert.alert_message_en : alert.alert_message_mr}</span>
+                    </div>
                   </div>
-                </div>
+                )) : (
+                  <div className="no-alerts">✅ No active alerts. Water quality is normal.</div>
+                )}
               </div>
-            )}
+            </div>
 
             <div className="table-container glass-card">
               <h2>📋 {t("sensorName")} {t("history") || 'History'}</h2>
               <table>
                 <thead>
-                  <tr><th>{t("dateTime")}</th><th>{t("ph")}</th><th>{t("tds")}</th><th>{t("turbidity")}</th><th>{t("dissolvedOxygen")}</th><th>{t("temperature")}</th><th>{t("waterLevel")}</th></tr>
+                  <tr><th>{t("dateTime")}</th><th>{t("ph")}</th><th>{t("tds")}</th><th>{t("turbidity")}</th><th>{t("status")}</th></tr>
                 </thead>
                 <tbody>
                   {sensorHistory.slice(0, 10).map((row, i) => (
                     <tr key={i}>
                       <td>{new Date(row.recorded_at).toLocaleString()}</td>
                       <td>{row.ph}</td><td>{row.tds}</td><td>{row.turbidity}</td>
-                      <td>{row.dissolved_oxygen}</td><td>{row.temperature}</td><td>{row.water_level}</td>
+                      <td>{rowStatusBadge(row)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -693,8 +696,9 @@ const Dashboard = () => {
         )}
       </div>
 
-      {showSuggestion && <SuggestionForm onClose={() => setShowSuggestion(false)} />}
-      {showProfile && <ProfileSettings t={t} token={token} user={user} onClose={() => setShowProfile(false)} onUpdate={() => {}} />}
+            {showSuggestion && <SuggestionForm onClose={() => setShowSuggestion(false)} />}
+            {showReport && <ReportIssue onClose={() => setShowReport(false)} />}
+            {showProfile && <ProfileSettings t={t} token={token} user={user} onClose={() => setShowProfile(false)} onUpdate={() => {}} />}
     </div>
   );
 };

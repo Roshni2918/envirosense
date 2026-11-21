@@ -6,6 +6,7 @@ import LoginChoice from "./LoginChoice";
 import Dashboard from "./Dashboard";
 import AdminLogin from "./AdminLogin";
 import AdminDashboard from "./AdminDashboard";
+import WhatsAppButton from "./WhatsAppButton";
 
 function App() {
   return (
@@ -19,6 +20,8 @@ function App() {
         <Route path="/adminLogin" element={<AdminLogin />} />
         <Route path="/adminDashboard" element={<AdminDashboard />} />
       </Routes>
+      {/* Floating WhatsApp chat button — visible on every page */}
+      <WhatsAppButton />
     </BrowserRouter>
   );
 }

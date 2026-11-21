@@ -267,6 +267,48 @@ body {
 .status-dot.green { background: var(--accent); }
 .status-val { margin-left: auto; font-weight: 600; color: var(--accent); font-size: 12px; }
 
+/* Field Monitoring Station (real photo from the Nagaon installation) */
+.station-section { background: #fff; max-width: 100%; padding: 60px 24px; }
+[data-theme="dark"] .station-section { background: #0f172a; }
+.station-grid {
+  max-width: 1200px; margin: 0 auto;
+  display: grid; grid-template-columns: 1.35fr 1fr; gap: 32px; align-items: stretch;
+}
+.station-photo-wrap {
+  position: relative; border-radius: var(--radius); overflow: hidden;
+  box-shadow: var(--shadow-lg); border: 1px solid var(--border);
+  background: #0f172a; min-height: 300px;
+}
+.station-photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+.station-photo-badge {
+  position: absolute; left: 14px; bottom: 14px;
+  background: rgba(15, 23, 42, 0.78); color: #f1f5f9;
+  padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.station-info { padding: 28px; display: flex; flex-direction: column; }
+.station-info h3 { margin: 0 0 18px; font-size: 17px; color: var(--primary); }
+.station-details { display: flex; flex-direction: column; gap: 13px; flex: 1; }
+.station-detail {
+  display: flex; flex-direction: column; gap: 3px;
+  padding-bottom: 12px; border-bottom: 1px dashed var(--border);
+}
+.station-detail:last-child { border-bottom: none; padding-bottom: 0; }
+.station-detail-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-light); font-weight: 700;
+}
+.station-detail-value { font-size: 14px; color: var(--text); font-weight: 500; }
+.station-live { color: var(--accent); font-weight: 600; }
+.station-map-btn {
+  margin-top: 18px; display: block; text-align: center; text-decoration: none;
+  padding: 12px 18px; border-radius: var(--radius-sm);
+}
+@media (max-width: 900px) {
+  .station-grid { grid-template-columns: 1fr; }
+  .station-photo-wrap { min-height: 220px; }
+}
+
 /* Stats Banner */
 .stats-banner {
   background: linear-gradient(135deg, var(--primary-dark), var(--primary));
@@ -666,4 +708,62 @@ th { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacin
   .parameters { grid-template-columns: 1fr; }
   .hero-actions { flex-direction: column; align-items: stretch; }
   .hero-stats-row { flex-direction: column; gap: 16px; }
+}
+
+/* ---- Critical alert notifications (landing) ---- */
+.alert-reg-section { background: linear-gradient(180deg, #f8fafc 0%, #f0f9ff 100%); }
+.alert-reg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+@media (max-width: 860px) {
+  .alert-reg-grid { grid-template-columns: 1fr; }
+}
+.alert-reg-benefits { display: flex; flex-direction: column; gap: 14px; justify-content: center; padding: 28px; }
+.alert-reg-benefit {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 15px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 14.5px;
+  color: #334155;
+}
+
+/* ---- Floating WhatsApp chat button (all pages) ---- */
+.whatsapp-float {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 1500;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 18px 11px 15px;
+  border-radius: 999px;
+  background: #25d366;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.2px;
+  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.45);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.whatsapp-float:hover {
+  background: #1ebf5a;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(37, 211, 102, 0.55);
+  color: #ffffff;
+}
+.whatsapp-float svg { flex-shrink: 0; }
+@media (max-width: 560px) {
+  .whatsapp-float { padding: 12px; right: 14px; bottom: 14px; }
+  .whatsapp-float .whatsapp-float-text { display: none; }
 }

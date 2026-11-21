@@ -12,7 +12,7 @@
 cd C:\envirosense-project\backend
 node server.js
 ```
-✅ Expected: `MySQL Connected`, `EnviroSense v2.0 Backend running on port 5000`
+✅ Expected: `MongoDB Connected`, `EnviroSense v3.0 Backend running on port 5000`
 
 **Terminal 2 — Frontend:**
 ```bash
@@ -30,7 +30,7 @@ npm start
 **Show:**
 1. 🌊 **Hero** — Animated waves, gradient text, stats banner
 2. 🔵 **LIVE badge** — Shows WebSocket connection status
-3. 📊 **Live Chart** — Real-time pH & TDS chart updating via Socket.io
+3. 📡 **Live status** — Readings counter updates on every WebSocket `sensor-update`
 4. 🎯 **Feature Cards** — 6 features with hover animations
 5. 🌐 **Language toggle** — Switch English ↔ Marathi on the fly
 6. 📈 **Stats row** — Readings count, Parameters, 24/7, WebSocket Live
@@ -47,7 +47,7 @@ npm start
 
 **Click Register → Fill form:**
 - Name: `Test User`, Email: `test@demo.com`, Phone: `9876543210`
-- Password: `test123`, Village: `Ashta`, Language: English/Marathi
+- Password: `test123`, Village: `Nagaon`, Language: English/Marathi
 
 ---
 
@@ -68,10 +68,10 @@ npm start
 - Circular gauge: Score 0-100 with color (Green/Blue/Yellow/Red)
 - Shows "Last reading: X minutes ago"
 
-**Say:** "Water Quality Index — composite score from all 6 parameters."
+**Say:** "Water Quality Index — composite score from pH, TDS and Turbidity."
 
-#### C. 6 Parameter Cards
-- Click each: pH, TDS, Turbidity, DO, Temperature, Water Level
+#### C. 3 Parameter Cards
+- Click each: pH, TDS, Turbidity
 - **Each shows: Value + Unit + Safe/Unsafe status**
 - Green border = Safe, Red = Unsafe
 
@@ -80,9 +80,9 @@ npm start
 #### D. Overall Water Status
 - Big green ✅ Safe or Red ⚠️ Unsafe banner
 
-#### E. Chart.js Trends
-- Dual-axis line chart: pH (left), TDS (right), Turbidity
-- Show how values trend over last 24 hours
+#### E. 🔮 6-Hour Forecast
+- Forecast cards for pH, TDS and Turbidity
+- Shows expected range and whether values stay safe
 
 #### F. History Table
 - Last 10 readings with timestamps
@@ -95,7 +95,7 @@ npm start
 
 1. Select date range (Start / End)
 2. Click **🔍 Search**
-3. Table shows: pH/TDS/Turbidity/DO/Temp/Water Level + ✅/⚠️ status per column
+3. Table shows: pH/TDS/Turbidity + ✅/⚠️ status per column
 4. Click **📥 PDF** → Generates with all safety statuses
 5. Click **📊 CSV** → Downloads CSV format
 
@@ -167,9 +167,8 @@ npm start
 ### Step 11: Emergency Alert Demo (1 min)
 
 **To trigger an alert (optional):** Insert an out-of-range reading
-```sql
-INSERT INTO sensor_readings (sensor_id, reading_value, reading_time, ph, tds, turbidity, dissolved_oxygen, temperature, water_level)
-VALUES (1, 0, NOW(), 9.5, 500, 8.0, 3.0, 35, 30);
+```bash
+curl -X POST http://localhost:5000/api/sensor-data -H "Content-Type: application/json" -d "{\"ph\": 9.5, \"tds\": 500, \"turbidity\": 8.0}"
 ```
 
 The **EmergencyAlert** modal appears:
@@ -197,8 +196,7 @@ The **EmergencyAlert** modal appears:
 - 6 Stats Cards: Total Readings, Total Users, Active Alerts, Pending Queries, Water Sources, Today's Readings
 
 #### B. 📊 Sensor Data Tab
-- Chart.js pH + Temperature trends
-- Recent readings table
+- Recent readings table (pH, TDS, Turbidity)
 
 #### C. 👤 Users Tab
 - Complete user table: ID, Name, Email, Phone, Village, Language, Role, Status
@@ -220,7 +218,7 @@ The **EmergencyAlert** modal appears:
 - **Generate PDF Report** → Includes per-parameter ✓/✗ + Overall status per row
 
 #### G. ⚙️ Settings Tab
-- Configure safe thresholds for all 6 parameters
+- Configure safe thresholds for pH, TDS and Turbidity
 - Auto-save on blur
 
 #### H. 📝 System Logs Tab
@@ -242,7 +240,7 @@ The **EmergencyAlert** modal appears:
 
 **Say:**
 > "EnviroSense v2.0 provides:
-> - ✅ Real-time WebSocket monitoring with data every 10 minutes
+> - ✅ Real-time WebSocket monitoring with data every hour
 > - ✅ Smart analytics with WQI scoring, trend charts, and calendar view
 > - ✅ Multi-level alerts (MEDIUM/HIGH/CRITICAL) with emergency popups
 > - ✅ Complete user dashboard (history, PDF, CSV, suggestions, profile)
