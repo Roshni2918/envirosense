@@ -1,0 +1,27 @@
+# Render blueprint — EnviroSense backend API (free tier)
+# Secrets (MONGODB_URI, JWT_SECRET, VAPID keys) are set manually in the
+# Render dashboard — they are intentionally marked sync: false here.
+services:
+  - type: web
+    name: enviroSense-api
+    runtime: node
+    rootDir: backend
+    instanceType: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/test
+    envVars:
+      - key: DB_NAME
+        value: envirosense_system
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        value: https://envirosense.vercel.app
+      - key: MONGODB_URI
+        sync: false # secret — paste your Atlas SRV string in the Render dashboard
+      - key: JWT_SECRET
+        sync: false # secret — paste the same value as your local backend/.env
+      - key: VAPID_PUBLIC_KEY
+        sync: false # optional — copy from local backend/.env to keep web push working
+      - key: VAPID_PRIVATE_KEY
+        sync: false # optional — copy from local backend/.env

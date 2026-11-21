@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { io } from "socket.io-client";
 import WaterSourcesMap from "./WaterSourcesMap";
 
-const socket = io(API_URL || undefined, { reconnection: process.env.NODE_ENV !== 'production' });
+const socket = io(API_URL || undefined); // auto-reconnect: the Render backend supports WebSockets
 
 function Landing() {
   const navigate = useNavigate();

@@ -15,7 +15,7 @@ import ReportIssue from "./ReportIssue";
 import usePushNotifications from "./usePushNotifications";
 import "./App.css";
 
-const socket = io(API_URL || undefined, { reconnection: process.env.NODE_ENV !== 'production' });
+const socket = io(API_URL || undefined); // auto-reconnect: the Render backend supports WebSockets
 
 const Dashboard = () => {
   const navigate = useNavigate();

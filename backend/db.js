@@ -38,7 +38,9 @@ async function connect() {
     }
   }
 
-  console.log(`MongoDB Connected ✅ (${DB_NAME} @ ${MONGODB_URI})`);
+  // Never print credentials: mask any user:password@ part of the URI.
+  const safeUri = String(MONGODB_URI).replace(/\/\/[^@/]*@/, '//***:***@');
+  console.log(`MongoDB Connected ✅ (${DB_NAME} @ ${safeUri})`);
   return db;
 }
 
